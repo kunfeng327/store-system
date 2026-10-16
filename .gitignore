@@ -1,0 +1,6 @@
+node_modules/
+dist/
+backend/backend.exe
+backend/config.yaml
+*.log
+.DS_Store
