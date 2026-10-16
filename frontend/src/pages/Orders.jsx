@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api, { getUser } from "../api";
 
+const PAY_LABEL = { wechat: "微信支付", alipay: "支付宝", union: "银联支付" };
+
 export default function Orders() {
   const user = getUser();
   const [orders, setOrders] = useState([]);
@@ -47,7 +49,8 @@ export default function Orders() {
               </div>
             ))}
             <div style={{ textAlign: "right", marginTop: 8, fontSize: 15 }}>
-              合计：<span className="card-price">¥{o.total}</span>
+              {PAY_LABEL[o.payment_method] || "微信支付"} · 合计：
+              <span className="card-price">¥{o.total}</span>
             </div>
           </div>
         ))

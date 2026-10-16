@@ -73,12 +73,13 @@ type Review struct {
 
 // Order 订单
 type Order struct {
-	ID        uint        `gorm:"primaryKey" json:"id"`
-	UserID    uint        `gorm:"index" json:"user_id"`
-	Total     float64     `json:"total"`
-	Type      string      `gorm:"size:10" json:"type"` // buy 购买 / box 盲盒
-	Items     []OrderItem `json:"items"`
-	CreatedAt time.Time   `json:"created_at"`
+	ID            uint        `gorm:"primaryKey" json:"id"`
+	UserID        uint        `gorm:"index" json:"user_id"`
+	Total         float64     `json:"total"`
+	Type          string      `gorm:"size:10" json:"type"`                 // buy 购买 / box 盲盒
+	PaymentMethod string      `gorm:"size:20;default:wechat" json:"payment_method"` // wechat 微信 / alipay 支付宝 / union 银联
+	Items         []OrderItem `json:"items"`
+	CreatedAt     time.Time   `json:"created_at"`
 }
 
 // OrderItem 订单商品

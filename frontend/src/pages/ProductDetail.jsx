@@ -3,6 +3,12 @@ import { useParams } from "react-router-dom";
 import api, { getUser } from "../api";
 import StarRating from "../components/StarRating";
 
+export const PAY_METHODS = {
+  wechat: { name: "微信支付", icon: "💚", desc: "推荐，秒到账" },
+  alipay: { name: "支付宝", icon: "💙", desc: "花呗可分期" },
+  union: { name: "银联支付", icon: "💳", desc: "银行卡直付" },
+};
+
 export default function ProductDetail() {
   const { id } = useParams();
   const user = getUser();
@@ -12,6 +18,10 @@ export default function ProductDetail() {
   const [ratingFilter, setRatingFilter] = useState("");
   const [qty, setQty] = useState(1);
   const [msg, setMsg] = useState("");
+  // 支付方式
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState("wechat");
+  const [paying, setPaying] = useState(false);
   // 发布评价表单
   const [myRating, setMyRating] = useState(5);
   const [myContent, setMyContent] = useState("");
@@ -37,14 +47,25 @@ export default function ProductDetail() {
   }, [id, ratingFilter]);
 
   const buy = async () => {
+    setPaying(true);
     try {
-      const r = await api.post("/orders", { product_id: Number(id), quantity: qty });
-      setMsg(r.data.message + `，花费 ¥${r.data.total}`);
+      const r = await api.post("/orders", {
+        product_id: Number(id),
+        quantity: qty,
+        payment_method: payMethod,
+      });
+      setMsg(
+        `${r.data.message}，花费 ¥${r.data.total}（${PAY_METHODS[payMethod].name}支付）`
+      );
+      setPayOpen(false);
       loadProduct();
       const me = await api.get("/me");
       localStorage.setItem("user", JSON.stringify(me.data));
     } catch (e) {
       setMsg(e.response?.data?.error || "购买失败");
+      setPayOpen(false);
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -98,13 +119,44 @@ export default function ProductDetail() {
             <button className="tab" onClick={() => setQty(qty + 1)}>+</button>
           </div>
           <button className="btn btn-outline">加入购物车</button>
-          <button className="btn btn-primary" onClick={buy} disabled={!user}>
+          <button className="btn btn-primary" onClick={() => user && setPayOpen(true)} disabled={!user}>
             立即购买
           </button>
           {!user && <div className="form-error">请先登录后购买</div>}
           {msg && <div className="msg">{msg}</div>}
         </div>
       </div>
+
+      {/* 收银台弹窗 */}
+      {payOpen && (
+        <div className="pay-mask" onClick={() => !paying && setPayOpen(false)}>
+          <div className="pay-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>收银台</h3>
+            <div className="pay-amount">
+              应付：<span className="card-price">¥{(p.price * qty).toFixed(2)}</span>
+            </div>
+            <div className="pay-options">
+              {Object.entries(PAY_METHODS).map(([key, m]) => (
+                <div
+                  key={key}
+                  className={`pay-option ${payMethod === key ? "active" : ""}`}
+                  onClick={() => setPayMethod(key)}
+                >
+                  <span className="pay-icon">{m.icon}</span>
+                  <div>
+                    <div className="pay-name">{m.name}</div>
+                    <div className="pay-desc">{m.desc}</div>
+                  </div>
+                  <span className="pay-check">{payMethod === key ? "●" : "○"}</span>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={buy} disabled={paying}>
+              {paying ? "支付中…" : `确认支付 ¥${(p.price * qty).toFixed(2)}`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 评价区（仿淘宝） */}
       <div className="review-section">

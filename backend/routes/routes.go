@@ -168,11 +168,17 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 		// ---- 购买 ----
 		auth.POST("/orders", func(c *gin.Context) {
 			var req struct {
-				ProductID uint `json:"product_id" binding:"required"`
-				Quantity  int  `json:"quantity" binding:"required,min=1"`
+				ProductID     uint   `json:"product_id" binding:"required"`
+				Quantity      int    `json:"quantity" binding:"required,min=1"`
+				PaymentMethod string `json:"payment_method"` // wechat/alipay/union
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(400, gin.H{"error": "参数错误"})
+				return
+			}
+			payMethod, ok := validPayMethod(req.PaymentMethod)
+			if !ok {
+				c.JSON(400, gin.H{"error": "支付方式仅支持 wechat（微信）/ alipay（支付宝）/ union（银联）"})
 				return
 			}
 			uid := c.GetUint("user_id")
@@ -205,7 +211,7 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 				}).Error; err != nil {
 					return err
 				}
-				order := models.Order{UserID: uid, Total: total, Type: "buy", Items: []models.OrderItem{{
+				order := models.Order{UserID: uid, Total: total, Type: "buy", PaymentMethod: payMethod, Items: []models.OrderItem{{
 					ProductID: p.ID, Name: p.Name, Image: p.Image, Rarity: p.Rarity, Price: p.Price, Quantity: req.Quantity,
 				}}}
 				return tx.Create(&order).Error
@@ -214,7 +220,7 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 				c.JSON(500, gin.H{"error": "下单失败"})
 				return
 			}
-			c.JSON(200, gin.H{"message": "购买成功", "total": total})
+			c.JSON(200, gin.H{"message": "购买成功", "total": total, "payment_method": payMethod})
 		})
 
 		auth.GET("/orders", func(c *gin.Context) {
@@ -226,6 +232,11 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 
 		// ---- 盲盒抽卡 ----
 		auth.POST("/box/draw", func(c *gin.Context) {
+			var req struct {
+				PaymentMethod string `json:"payment_method"`
+			}
+			_ = c.ShouldBindJSON(&req) // 允许空 body
+			payMethod, _ := validPayMethod(req.PaymentMethod)
 			uid := c.GetUint("user_id")
 			var user models.User
 			if err := db.First(&user, uid).Error; err != nil {
@@ -257,7 +268,7 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 				}).Error; err != nil {
 					return err
 				}
-				order := models.Order{UserID: uid, Total: boxPrice, Type: "box", Items: []models.OrderItem{{
+				order := models.Order{UserID: uid, Total: boxPrice, Type: "box", PaymentMethod: payMethod, Items: []models.OrderItem{{
 					ProductID: p.ID, Name: p.Name, Image: p.Image, Rarity: p.Rarity, Price: p.Price, Quantity: 1,
 				}}}
 				if err := tx.Create(&order).Error; err != nil {
@@ -269,7 +280,7 @@ func Setup(r *gin.Engine, db *gorm.DB) {
 				c.JSON(500, gin.H{"error": "抽取失败"})
 				return
 			}
-			c.JSON(200, gin.H{"product": p, "coins_left": user.Coins - boxPrice, "drawn_at": time.Now()})
+			c.JSON(200, gin.H{"product": p, "coins_left": user.Coins - boxPrice, "drawn_at": time.Now(), "payment_method": payMethod})
 		})
 
 		auth.GET("/box/records", func(c *gin.Context) {
@@ -310,6 +321,18 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_id", uint(claims["user_id"].(float64)))
 		c.Set("username", claims["username"].(string))
 		c.Next()
+	}
+}
+
+// validPayMethod 校验支付方式，默认微信
+func validPayMethod(m string) (string, bool) {
+	switch m {
+	case "", "wechat":
+		return "wechat", true
+	case "alipay", "union":
+		return m, true
+	default:
+		return "", false
 	}
 }
 

@@ -9,12 +9,19 @@ const RARITY_TEXT = {
   SSR: "传说 SSR ✨",
 };
 
+const PAY_METHODS = {
+  wechat: "微信支付 💚",
+  alipay: "支付宝 💙",
+  union: "银联 💳",
+};
+
 export default function BlindBox() {
   const user = getUser();
   const [drawing, setDrawing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [records, setRecords] = useState([]);
+  const [payMethod, setPayMethod] = useState("wechat");
 
   const loadRecords = () => {
     if (!user) return;
@@ -32,7 +39,7 @@ export default function BlindBox() {
     setError("");
     setTimeout(async () => {
       try {
-        const r = await api.post("/box/draw");
+        const r = await api.post("/box/draw", { payment_method: payMethod });
         setResult(r.data);
         const u = { ...user, coins: r.data.coins_left };
         setUser(u);
@@ -70,6 +77,17 @@ export default function BlindBox() {
               <button className="btn btn-primary" onClick={draw} disabled={drawing}>
                 {drawing ? "开启中…" : "开启盲盒（60 🪙）"}
               </button>
+            </div>
+            <div className="tabs" style={{ justifyContent: "center", marginTop: 14 }}>
+              {Object.entries(PAY_METHODS).map(([key, label]) => (
+                <span
+                  key={key}
+                  className={`tab ${payMethod === key ? "active" : ""}`}
+                  onClick={() => setPayMethod(key)}
+                >
+                  {label}
+                </span>
+              ))}
             </div>
             {error && <div className="form-error" style={{ marginTop: 12 }}>{error}</div>}
           </>
